@@ -24,7 +24,7 @@ def main(argv=sys.argv[1:]): # gittu add filename.txt
         # case "check-ignore": cmd_check_ignore(args)
         # case "commit" : cmd_commit(args)
         # case "hash-object" : cmd_hash_object(args)
-        # case "init" : cmd_init(args)
+        case "init" : cmd_init(args)
         # case "log" : cmd_log(args)
         # case "ls-files" :cmd_ls_files(args)
         # case "ls-tree": cmd_ls_tree(args)
@@ -49,10 +49,10 @@ class GitRepository (object):
 
     def __init__(self, path, force=False):
         self.workrepo = path 
-        self.gitdir = os.path.join(path, '.git')
+        self.gitdir = os.path.join(path, '.gittu')
 
         if not(force or os.path.isdir(self.gitdir)):
-            raise Exception(f"Not a git repository {path}")
+            raise Exception(f"Not a gittu repository {path}")
         
         self.conf = configparser.ConfigParser()
         cf = repo_file(self, "config")
@@ -94,3 +94,57 @@ def repo_dir(repo, *path, mkdir=False):
         return path
     else:
         return None
+
+
+def repo_create(path):
+
+    repo = GitRepository(path, force=True)
+
+    if os.path.exists(repo.workrepo):
+        if not os.path.isdir(repo.workrepo):
+            raise Exception(f"${path} is not a directory!")
+        if os.path.exists(repo.gitdir) and os.listdir(repo.gitdir):
+            raise Exception(f"${path} is a already a gittu repository!")
+    else:
+        os.makedirs(repo.workrepo)
+
+    #initialize the git directory
+    assert repo_dir(repo, "branches", mkdir=True)
+    assert repo_dir(repo, "objects", mkdir=True)
+    assert repo_dir(repo, "refs", "tags", mkdir=True)
+    assert repo_dir(repo, "refs", "heads", mkdir=True)
+
+    with open(repo_file(repo, "description"), "w") as f:
+        f.write("Unnamed repository; edit this file 'description' to name the repository.\n")
+
+    with open(repo_file(repo, "HEAD"), "w") as f:
+        f.write("ref: refs/heads/master\n")
+    
+    with open(repo_file(repo, "config"), "w") as f:
+        config = repo_default_config()
+        config.write(f)
+
+    return repo
+
+
+def repo_default_config():
+    config = configparser.ConfigParser()
+
+    config.add_section("core")
+    config.set("core", "repositoryformatversion", "0")
+    config.set("core", "filemode", "true")
+    config.set("core", "bare", "false")
+
+    return config
+
+arginit = argsubparser.add_parser("init", help="Initialize a new, empty repository.")
+arginit.add_argument(
+    "path",
+    metavar="directory",
+    nargs="?",
+    default=".", #default should be current directory
+    help="Path to the repository to be initialized.",
+    )
+
+def cmd_init(args):
+    repo_create(args.path)
